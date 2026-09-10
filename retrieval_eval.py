@@ -1,22 +1,11 @@
 import json
 from pathlib import Path
 
-from langchain_community.embeddings import OllamaEmbeddings
-from langchain_community.vectorstores import FAISS
-from sentence_transformers import CrossEncoder
+from utils.faiss_store import load_vectorstore
+from utils.reranker import RERANKER_MODEL, load_reranker, rerank_results
 
 
 RETRIEVAL_K = 20
-RERANKER_MODEL = "BAAI/bge-reranker-v2-m3"
-
-
-def load_vectorstore(index_path: str = "faiss_index"):
-    embeddings = OllamaEmbeddings(model="nomic-embed-text")
-    return FAISS.load_local(
-        index_path,
-        embeddings,
-        allow_dangerous_deserialization=True,
-    )
 
 
 def load_questions(
@@ -28,19 +17,6 @@ def load_questions(
 
 def normalize_source(source: str) -> str:
     return source.replace("\\", "/").lstrip("./")
-
-
-def rerank_results(reranker, query: str, documents):
-    pairs = [(query, document.page_content) for document in documents]
-    scores = reranker.predict(pairs)
-
-    ranked = sorted(
-        zip(scores, documents),
-        key=lambda item: item[0],
-        reverse=True,
-    )
-
-    return [document for _, document in ranked]
 
 
 def get_sources(documents):
@@ -93,10 +69,7 @@ def main():
     vectorstore = load_vectorstore()
 
     print(f"Loading reranker: {RERANKER_MODEL}")
-    reranker = CrossEncoder(
-        RERANKER_MODEL,
-        device="cuda",
-    )
+    reranker = load_reranker()
 
     questions = load_questions()
     print(f"Loaded {len(questions)} questions.")
